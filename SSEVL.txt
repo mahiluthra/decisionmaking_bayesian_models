@@ -1,0 +1,71 @@
+
+
+data {
+  for (i in 1:s){
+      for (j in 1:n){
+        ones[i,j] <- 1
+      }
+  }
+}
+
+model{
+
+  for (i in 1:s){
+    for(j in 1:n) {
+
+      # model comparision
+
+      mods[i, j] <- equals(m[i],1)*m1[i, j] + equals(m[i],2)*m2[i, j]
+      ones[i, j] ~ dbern( mods[i, j] )
+
+      # model random
+
+      m2[ i, j] <- prob[i]^y[ ((i-1)*n) + j] * (1-prob[i] )^(1-y[ ((i-1)*n) + j])
+
+      # model recency
+
+      m1[ i, j] <- predchoice[ i, j]^y[ ((i-1)*n) + j] * (1-predchoice[ i, j])^(1-y[ ((i-1)*n) + j])
+
+      predchoice[ i, j] <- predchoicemax[i, j]/(predchoicemax[ i, j]+predchoicenomax[ i, j])
+
+      predchoicemax[ i, j] <- step(j - t[i]) * exp( th[ i, j] * 1) +
+                        step( t[i] - j) * exp( th[ i , j] * ev_max[ i, j])
+
+      predchoicenomax[ i, j] <- step(j - t[i]) * exp( th[ i, j] * 0) +
+                          step(t[i] -j -1) * exp( th[ i, j] * ev_nomax[ i, j])
+
+      ev_max[ i, (j+1)] <-  step(j - t[i]) * 1 +
+                                 step( t[i] - j) * ( (1 - ( 1/j ^ alpha[i]) ) * ev_max[ i, j] ) + ( (1/j ^ alpha[i]) * x[ ((i-1)*n) + j])
+      ev_nomax[ i, (j+1)] <- step(j - t[i]) * 1 +
+                                    step( t[i] - j) *  (1 - ev_max[ i, j])
+
+      th[ i , j] <- (j/10) ^ (theta[i] * 2.5)
+    }
+
+    ev_max[ i, 1 ] <- 0.5
+    ev_nomax[ i, 1 ] <- 0.5
+
+    prob[i] ~ dbeta( omega[3]*(kappa[3]-2) + 1, (1-omega[3]) * (kappa[3]-2) +1)
+    theta[i] ~ dbeta( omega[1]*(kappa[1]-2) + 1, (1-omega[1]) * (kappa[1]-2) +1)
+    alpha[i] ~ dbeta( omega[2]*(kappa[2]-2) + 1, (1-omega[2]) * (kappa[2]-2) +1)
+
+    t[i] ~ dcat(cp[,i])
+    for (tn in 1:n){
+	cp[tn, i] <- 1/n
+    }
+
+    m[i] ~ dcat( mPriorProb[,i] )
+    mPriorProb[1, i] <- .5
+    mPriorProb[2, i] <- .5
+  }
+
+  for (k in 1:3){
+  omega[k] ~ dbeta(1,1)
+  kappa[k] <- kappaMinusTwo[k] + 2
+  }
+
+  kappaMinusTwo[1] ~ dgamma(0.01, 0.01)
+  kappaMinusTwo[2] ~ dgamma(0.01, 0.01)
+  kappaMinusTwo[3] ~ dgamma(0.01, 0.01)
+}
+
